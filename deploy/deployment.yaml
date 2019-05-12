@@ -22,8 +22,8 @@ spec:
       serviceAccount: kube-lookout
       containers:
       - name: kube-lookout
-        image: davidjmarkey/kube-lookout:latest
-        imagePullPolicy: Never
+        image: davidjmarkey/kube-lookout:0.2
+        imagePullPolicy: Always
         env:
         - name: SLACK_TOKEN
-          value: "insert_token_here"
+          value: "insert token here"
