@@ -1,0 +1,13 @@
+services:
+- docker
+language: python
+python:
+- '3.6'
+script:
+- set -e
+- pytest
+- make image
+- make push-image
+env:
+  global:
+    secure: KsNT+nWRysmB/4Inf1UfVx840Z5eLggjxln+mNhTgmCOdq2A2V+CVMk74YIW2KtKD29IozagSRZoLppUyjKlGcN0uRd7msx76z3AajyE+XHlCgBtCcCNJBCzeePRKXQrGaTMUrX+9Doe6INvTCB6wCK5So9EkNfz0dcgNvPllJ9XHx+ZBZ8+gTQgBI+xVP1UQHlfoT4c15TH5w5Yih52wzjXKXG2XnJge17XCBYaDLmP474SCTrfb+EL4ZTg7OE/Ye4pphWd7oaeHbUBEt0rQnW/2oddpfkwYkdHB1DGG8ia3o+/mY1iRV4RPpwGLDtnQG5xF6Ct6Neouykq1ud4LYTr1L7/3PI/AMQmLQYymO3G7UV/3/XSZ41+2kB1VSCHCsXyEyXNaxabbP85Q91ksEMjS0oLs30bC1+FeWQxwYduqDxiWfWmliFApelJeVATMTFgTEM7rgAtMaWBMTHLbzX+z5QxRNFguaSePv229cznqql9ehXlhn8GEWrBb8boTaWIVN7E0H77eWg1+La/TsF8psyeNQbpkb7VyKdPkqHVLavEiP5Q/Okmoy+xwIg7/g+p6pmsfKqfymhoWvak2FtKk4/CRZD1ubMjThDU71HRc6PvgpG8QiA44NJPzVsPi1tQ1UZEKQd8dbkz1ZkEvnYANZAa+V6PU4EMvt8FBdk=
