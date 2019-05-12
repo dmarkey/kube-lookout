@@ -16,7 +16,7 @@ More to come
 
 Check deploy/* for example manifests
 
-The following ENV varibales are used:
+The following ENV variables are used:
 
 1. SLACK_TOKEN - A Slack Bot User OAuth Access Token - mandatory
 2. SLACK_CHANNEL - Slack channel, defaults to "#general"
