@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: kube-lookout
+  name: kube-lookout
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-lookout
+  labels:
+    k8s-app: kube-lookout
+rules:
+- apiGroups:
+  - extensions
+  resources:
+  - deployments
+  verbs:
+  - list
+  - get
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-lookout
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-lookout
+subjects:
+  - kind: ServiceAccount
+    name: kube-lookout
+    namespace: kube-system

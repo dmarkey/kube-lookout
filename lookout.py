@@ -78,6 +78,10 @@ class KubeLookout:
         metadata = deployment.metadata
         deployment_key = f"{metadata.namespace}/{metadata.name}"
 
+        ready_replicas = 0
+        if deployment.status.ready_replicas is not None:
+            ready_replicas = deployment.status.ready_replicas
+
         if deployment_key not in self.rollouts and \
                 deployment.status.updated_replicas is None:
             blocks = self._generate_deployment_rollout_block(deployment)
@@ -88,7 +92,7 @@ class KubeLookout:
             rollout_complete = (
                     deployment.status.updated_replicas ==
                     deployment.status.replicas ==
-                    deployment.status.ready_replicas)
+                    ready_replicas)
             blocks = self._generate_deployment_rollout_block(deployment,
                                                              rollout_complete)
             self.rollouts[deployment_key] = self._send_slack_block(
@@ -97,14 +101,13 @@ class KubeLookout:
 
             if rollout_complete:
                 self.rollouts.pop(deployment_key)
-        elif deployment.status.ready_replicas < deployment.spec.replicas:
+        elif ready_replicas < deployment.spec.replicas:
             blocks = self._generate_deployment_degraded_block(deployment)
             self._send_slack_block(blocks, self.slack_channel)
             self.degraded.add(deployment_key)
 
         elif (deployment_key in self.degraded and
-              deployment.status.ready_replicas
-              >= deployment.spec.replicas):
+              ready_replicas >= deployment.spec.replicas):
             self.degraded.remove(deployment_key)
             blocks = self._generate_deployment_not_degraded_block(deployment)
             self._send_slack_block(blocks, self.slack_channel)
@@ -124,11 +127,6 @@ class KubeLookout:
             print("Waiting for deployment events to come in..")
             for event in stream:
                 deployment = event['object']
-                obj = event["object"]
-                code = obj.get("code")
-                if code == 410:
-                    print("Received HTTP 410, restarting..")
-                    break
                 self._handle_event(deployment)
 
     def _generate_deployment_rollout_block(self, deployment,

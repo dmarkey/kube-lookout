@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1 # for versions before 1.8.0 use apps/v1beta1
+kind: Deployment
+metadata:
+  name: kube-lookout
+  labels:
+    app: kube-lookout
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-lookout
+  strategy:
+   rollingUpdate:
+     maxSurge: 1
+     maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: kube-lookout
+    spec:
+      serviceAccount: kube-lookout
+      containers:
+      - name: kube-lookout
+        image: davidjmarkey/kube-lookout:latest
+        imagePullPolicy: Never
+        env:
+        - name: SLACK_TOKEN
+          value: "insert_token_here"
