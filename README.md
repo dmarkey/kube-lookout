@@ -21,7 +21,7 @@ The following ENV variables are used:
 1. SLACK_TOKEN - A Slack Bot User OAuth Access Token - mandatory
 2. SLACK_CHANNEL - Slack channel, defaults to "#general"
 3. CLUSTER_NAME - this is prefixed for most messages on slack, defaults to "Kubernetes Cluster"
-4. PROGRESS_IMAGE, OK_IMAGE, WARNING_IMAGE - the URLs of images used for the slack notifications. Defaults to kinda ugly creative commons images, but do to job. (dont use SVGs I learned.)
+4. PROGRESS_IMAGE, OK_IMAGE, WARNING_IMAGE - the URLs of images used for the slack notifications. Defaults to kinda ugly creative commons images, but does the job. (dont use SVGs I learned.)
 
 
 ## Screenshots
