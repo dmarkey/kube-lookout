@@ -26,5 +26,7 @@ The following ENV variables are used:
 
 ## Screenshots
 
+## Deployment Rollout
 ![Rollout Slack Notification](images/example2.png)
+## Degraded deployment
 ![Degraded Slack Notification](images/example1.png)
