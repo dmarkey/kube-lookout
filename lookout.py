@@ -1,3 +1,4 @@
+import configparser
 import os
 from copy import copy
 
@@ -16,29 +17,26 @@ def main_loop(receiver):
         print("Waiting for deployment events to come in..")
         for event in stream:
             deployment = event['object']
+            print(deployment)
             receiver._handle_event(deployment)
 
 if __name__ == "__main__":
-    env_warning_image = os.environ.get(
-        "WARNING_IMAGE",
-        "https://upload.wikimedia.org/wikipedia/"
-        "commons/thumb/6/6e/Dialog-warning.svg/"
-        "200px-Dialog-warning.svg.png")
-    env_progress_image = os.environ.get("PROGRESS_IMAGE",
-                                        "https://i.gifer.com/80ZN.gif")
-    env_ok_image = os.environ.get("OK_IMAGE",
-                                  "https://upload.wikimedia.org/wikipedia/"
-                                  "commons/thumb/f/fb/Yes_check.svg/"
-                                  "200px-Yes_check.svg.png")
-    env_slack_token = os.environ["SLACK_TOKEN"]
-    env_slack_channel = os.environ.get("SLACK_CHANNEL", "#general")
-    env_cluster_name = os.environ.get("CLUSTER_NAME", "Kubernetes Cluster")
 
-   
-    receiver = SlackReceiver(env_warning_image,
-                                    env_progress_image,
-                                    env_ok_image, env_slack_token,
-                                    env_slack_channel, env_cluster_name)
+    config = configparser.ConfigParser()
+    config.read("config.ini")
+    
+    warning_image = config.get("default", "warning_image", fallback=os.environ.get("WARNING_IMAGE"))
+    ok_image = config.get("default", "ok_image", fallback=os.environ.get("OK_IMAGE"))
+    progress_image = config.get("default", "progress_image", fallback=os.environ.get("PROCESS_IMAGE"))
+    cluster_name = config.get("default", "cluster_name", fallback=os.environ.get("CLUSTER_NAME", "Kubernetes Cluster"))
+
+    slack_token = config.get("receiver.slack", "token", fallback=os.environ["SLACK_TOKEN"])
+    slack_channel = config.get("receiver.slack", "channel", fallback=os.environ["SLACK_CHANNEL"])
+
+    receiver = SlackReceiver(warning_image,
+                             progress_image,
+                             ok_image, slack_token,
+                             slack_channel, cluster_name)
 
     receiver._init_client()
     main_loop(receiver)
