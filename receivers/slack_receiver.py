@@ -28,31 +28,29 @@ class SlackReceiver(Receiver):
     ]
 
     def __init__(self, warning_image, progress_image, ok_image,
-                 slack_key, slack_channel, cluster_name):
-        
+                 slack_key, channel, cluster_name):
+
         super().__init__(warning_image, progress_image, ok_image, cluster_name)
 
         self.slack_client = None
         self.slack_key = slack_key
-        self.slack_channel = slack_channel
-    
-    
-    def _send_message(self, data, channel, message_id=None):
+        self.channel = channel
+
+    def _send_message(self, data, message_id=None):
         if self.slack_client is None:
             self.slack_client = slack.WebClient(
                 self.slack_key)
 
         if message_id is None:
-            response = self.slack_client.chat_postMessage(channel=channel,
+            response = self.slack_client.chat_postMessage(channel=self.channel,
                                                           blocks=data)
-            return response.data['ts'], response.data['channel']
-        
+            return response.data['ts']
+
         response = self.slack_client.chat_update(
             channel=channel,
             ts=message_id, blocks=data)
-        return response.data['ts'], response.data['channel']
+        return response.data['ts']
 
-   
     def _generate_deployment_rollout_message(self, deployment,
                                            rollout_complete=False):
 
