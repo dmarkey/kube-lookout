@@ -1,6 +1,7 @@
 import yaml
 import os
 import sys
+import argparse
 
 from kubernetes import watch, client, config
 
@@ -34,7 +35,18 @@ def main_loop(receivers):
 
 if __name__ == "__main__":
 
-    with open("config.yml", 'r') as ymlfile:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', required=True, help='path to configuration file')
+    args = parser.parse_args()
+
+    config_file = args.config
+
+    if not os.path.exists(config_file):
+        print("Config not found: %s" % (config_file))
+        sys.exit(1)
+
+    print("Using config: %s" % (config_file))
+    with open(config_file, 'r') as ymlfile:
         yaml_config = yaml.load(ymlfile)
 
     images = yaml_config.get("images", {})
