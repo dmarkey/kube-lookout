@@ -1,28 +1,18 @@
 import os
-from kubernetes import client, config
 
 
 class Receiver(object):
 
-    def __init__(self, warning_image, progress_image, ok_image, cluster_name):
-
+    def __init__(self, cluster_name, warning_image, progress_image, ok_image):
+        self.cluster_name = cluster_name
         self.warning_image = warning_image
         self.ok_image = ok_image
         self.progress_image = progress_image
 
-        self.cluster_name = cluster_name
         self.rollouts = {}
         self.degraded = set()
 
         self.channel = None
-
-    def _init_client(self):
-        if "KUBERNETES_PORT" in os.environ:
-            config.load_incluster_config()
-        else:
-            config.load_kube_config()
-        api_client = client.api_client.ApiClient()
-        self.core = client.ExtensionsV1beta1Api(api_client)
 
 
     def _handle_deployment_change(self, deployment):
@@ -51,7 +41,9 @@ class Receiver(object):
                                                              rollout_complete)
 
             self.rollouts[deployment_key] = self._send_message(
-                message_id = self.rollouts[deployment_key][0], data=data)
+                # FIXME: This isn't ideal for flowdock yet.
+                channel=self.rollouts[deployment_key][1],
+                message_id=self.rollouts[deployment_key][0], data=data)
 
             if rollout_complete:
                 self.rollouts.pop(deployment_key)

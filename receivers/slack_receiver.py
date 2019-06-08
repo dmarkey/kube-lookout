@@ -27,16 +27,18 @@ class SlackReceiver(Receiver):
         }
     ]
 
-    def __init__(self, warning_image, progress_image, ok_image,
-                 slack_key, channel, cluster_name):
+    def __init__(self, cluster_name, warning_image, progress_image, ok_image,
+                 slack_key, channel):
 
-        super().__init__(warning_image, progress_image, ok_image, cluster_name)
+        super().__init__(cluster_name, warning_image, progress_image, ok_image)
 
         self.slack_client = None
         self.slack_key = slack_key
         self.channel = channel
 
-    def _send_message(self, data, message_id=None):
+        print("configured slack-receiver for %s" % (self.channel))
+
+    def _send_message(self, data, channel=None, message_id=None):
         if self.slack_client is None:
             self.slack_client = slack.WebClient(
                 self.slack_key)
@@ -44,15 +46,15 @@ class SlackReceiver(Receiver):
         if message_id is None:
             response = self.slack_client.chat_postMessage(channel=self.channel,
                                                           blocks=data)
-            return response.data['ts']
+        else:
+            response = self.slack_client.chat_update(channel=channel,
+                                                     ts=message_id,
+                                                     blocks=data)
 
-        response = self.slack_client.chat_update(
-            channel=channel,
-            ts=message_id, blocks=data)
-        return response.data['ts']
+        return response.data['ts'], response.data['channel']
 
     def _generate_deployment_rollout_message(self, deployment,
-                                           rollout_complete=False):
+                                             rollout_complete=False):
 
         block = copy(self.template)
         header = f"*{self.cluster_name} deployment " \
@@ -91,7 +93,7 @@ class SlackReceiver(Receiver):
             f" has {deployment.status.ready_replicas} ready replicas " \
             f"when it should have {deployment.spec.replicas}.\n"
 
-        message += _generate_progress_bar(deployment.status.ready_replicas,
+        message += utils.generate_progress_bar(deployment.status.ready_replicas,
                                           deployment.spec.replicas)
 
         block[0]['text']['text'] = header
@@ -114,7 +116,7 @@ class SlackReceiver(Receiver):
             f"replicas out of " \
             f"{deployment.spec.replicas}.\n"
 
-        message += _generate_progress_bar(deployment.status.ready_replicas,
+        message += utils.generate_progress_bar(deployment.status.ready_replicas,
                                           deployment.spec.replicas)
 
         block[0]['text']['text'] = header

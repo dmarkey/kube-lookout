@@ -22,17 +22,19 @@ class FlowdockReceiver(Receiver):
         }
     }
 
-    def __init__(self, warning_image, progress_image, ok_image,
-                 flowdock_token, cluster_name):
+    def __init__(self, cluster_name, warning_image, progress_image, ok_image,
+                 flowdock_token):
 
-        super().__init__(warning_image, progress_image, ok_image, cluster_name)
+        super().__init__(cluster_name, warning_image, progress_image, ok_image)
 
         self.flowdock_client = None
         self.flowdock_token = flowdock_token
         self.channel = "fake-not-used-yet-as-tied-to-token"
 
-    def _send_message(self, data, message_id=None):
+        print("configured flow-receiver for %s" % (self.flowdock_token))
 
+    def _send_message(self, data, channel=None, message_id=None):
+        # FIXME: channel not used here
         item_id = data.get('resource_uid')
         author = data.get('author')
         title = "deploy monitor"
@@ -74,7 +76,6 @@ class FlowdockReceiver(Receiver):
         data = copy(self.template)
         data["title"] = header
         data["thread"]["title"] = header
-
         data["thread"]["body"] = message
 
         if rollout_complete:
@@ -121,7 +122,7 @@ class FlowdockReceiver(Receiver):
         data = copy(self.template)
         data["title"] = header
         data["thread"]["title"] = header
-        data["thread"]["body"]= message
+        data["thread"]["body"] = message
 
         data["thread"]["status"]["value"] = 'DEPLOYED'
         data["thread"]["status"]["color"] = 'green'

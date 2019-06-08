@@ -14,19 +14,14 @@ kube-lookout.com/enable-notification: [true|false]
 kube-lookout.com/channel: [channel-name]
 ```
 
-configuration file like so:
+## Cleanup flowdock threading
 
-```yaml
+It's not threading correctly yet (should edit existing thread0
 
-reciever: slack|flowdock
+## Envars are useful, make them work with the config
 
-default_token: some-token
-default_channel: some-channel
+Environment vars work really well wiht k8s, but this moves toward a config.
 
-flowdock: 
-  channel: token1
-  channel: token2
-slack
-  channel: token1
-  channel: token1
-```
+We could allow envars to be specified inside the config and take them from the env.
+
+That way the config can be committed,  but envvars for secrets (tokens etc) can still be used
