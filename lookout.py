@@ -9,6 +9,13 @@ from receivers.slack_receiver import SlackReceiver
 from receivers.flowdock_receiver import FlowdockReceiver
 
 
+def format_constructor(loader, node):
+    return loader.construct_scalar(node).format(**os.environ)
+
+
+yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
+
+
 def main_loop(receivers):
 
     if "KUBERNETES_PORT" in os.environ:
@@ -33,6 +40,7 @@ def main_loop(receivers):
             for receiver in receivers:
                 receiver._handle_event(deployment)
 
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -47,7 +55,7 @@ if __name__ == "__main__":
 
     print("Using config: %s" % (config_file))
     with open(config_file, 'r') as ymlfile:
-        yaml_config = yaml.load(ymlfile)
+        yaml_config = yaml.safe_load(ymlfile)
 
     images = yaml_config.get("images", {})
     warning_image = images.get("warn", os.environ.get("WARNING_IMAGE")) 
