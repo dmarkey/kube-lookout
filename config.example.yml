@@ -8,13 +8,13 @@ receivers:
   slack: 
     myteam:
       channel: "#test"
-      token: "$LEGACY_SLACK_TOKEN"
+      token: "{LEGACY_SLACK_TOKEN}"
     myteam2:
       channel: "#random"
-      token: "$LEGACY_SLACK_TOKEN"
+      token: "{LEGACY_SLACK_TOKEN}"
   flowdock:
     myteam:
-      token: "$FLOWDOCK_TOKEN"
+      token: "{FLOWDOCK_TOKEN}"
     myteam2:
-      token: "$FLOWDOCK_TOKEN"
+      token: "{FLOWDOCK_TOKEN}"
 
