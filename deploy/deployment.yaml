@@ -1,10 +1,11 @@
-apiVersion: extensions/v1beta1 # for versions before 1.8.0 use apps/v1beta1
+---
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-lookout
   labels:
     app: kube-lookout
-  namespace: kube-system
+  namespace: kube-lookout
 spec:
   replicas: 1
   selector:
@@ -22,8 +23,18 @@ spec:
       serviceAccount: kube-lookout
       containers:
       - name: kube-lookout
-        image: davidjmarkey/kube-lookout:0.2
-        imagePullPolicy: Always
-        env:
-        - name: SLACK_TOKEN
-          value: "insert token here"
+        image: nabadger/kube-lookout:latest
+        args: ["--config", "/etc/kube-lookout/config.yml"]
+        envFrom:
+        - secretRef:
+            name: kube-lookout
+        volumeMounts:
+        - name: config
+          mountPath: /etc/kube-lookout
+      volumes  :
+      - name: config
+        configMap:
+          name: kube-lookout
+      - name: credentials
+        secret:
+          secretName: kube-lookout
