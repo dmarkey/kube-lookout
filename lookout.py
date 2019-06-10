@@ -1,226 +1,114 @@
+import yaml
 import os
-from copy import copy
+import sys
+import argparse
 
-from kubernetes import client, config, watch
-import slack
+from kubernetes import watch, client, config
 
-
-def _generate_progress_bar(position, max_value):
-    if position is None:
-        position = 0
-
-    filled_squares = (100 / max_value * position) / 5
-
-    filled_char = "⬛"
-    empty_char = "⬜"
-    return (filled_char * int(filled_squares)) + (
-            empty_char * (20 - int(filled_squares))) + "\n"
+from receivers.slack_receiver import SlackReceiver
+from receivers.flowdock_receiver import FlowdockReceiver
 
 
-class KubeLookout:
-    template = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ""
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ""
-            },
-            "accessory": {
-                "type": "image",
-                "image_url": "",
-                "alt_text": "status image"
-            }
-        }
-    ]
+def format_constructor(loader, node):
+    return loader.construct_scalar(node).format(**os.environ)
 
-    def __init__(self, warning_image, progress_image, ok_image,
-                 slack_key, slack_channel, cluster_name):
-        super().__init__()
-        self.warning_image = warning_image
-        self.ok_image = ok_image
-        self.progress_image = progress_image
-        self.slack_client = None
-        self.slack_key = slack_key
-        self.slack_channel = slack_channel
-        self.cluster_name = cluster_name
-        self.rollouts = {}
-        self.degraded = set()
 
-    def _init_client(self):
-        if "KUBERNETES_PORT" in os.environ:
-            config.load_incluster_config()
-        else:
-            config.load_kube_config()
-        api_client = client.api_client.ApiClient()
-        self.core = client.ExtensionsV1beta1Api(api_client)
+yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
 
-    def _send_slack_block(self, blocks, channel, message_id=None):
-        if self.slack_client is None:
-            self.slack_client = slack.WebClient(
-                self.slack_key)
-        if message_id is None:
-            response = self.slack_client.chat_postMessage(channel=channel,
-                                                          blocks=blocks)
-            return response.data['ts'], response.data['channel']
-        response = self.slack_client.chat_update(
-            channel=channel,
-            ts=message_id, blocks=blocks)
-        return response.data['ts'], response.data['channel']
+ANNOTATION_ENABLED = "kube-lookout/enabled"
+ANNOTATION_TEAM = "kube-lookout/team"
+ANNOTATION_RECEIVER = "kube-lookout/receiver"
 
-    def _handle_deployment_change(self, deployment):
-        metadata = deployment.metadata
-        deployment_key = f"{metadata.namespace}/{metadata.name}"
+def main_loop(receivers):
 
-        ready_replicas = 0
-        if deployment.status.ready_replicas is not None:
-            ready_replicas = deployment.status.ready_replicas
+    if "KUBERNETES_PORT" in os.environ:
+        config.load_incluster_config()
+    else:
+        config.load_kube_config()
+    api_client = client.api_client.ApiClient()
+    core = client.ExtensionsV1beta1Api(api_client)
 
-        if deployment_key not in self.rollouts and \
-                deployment.status.updated_replicas is None:
-            blocks = self._generate_deployment_rollout_block(deployment)
-            resp = self._send_slack_block(blocks, self.slack_channel)
-            self.rollouts[deployment_key] = resp
+    while True:
+        pods = core.list_deployment_for_all_namespaces(watch=False)
+        resource_version = pods.metadata.resource_version
+        stream = watch.Watch().stream(core.list_deployment_for_all_namespaces,
+                                      resource_version=resource_version)
 
-        elif deployment_key in self.rollouts:
-            rollout_complete = (
-                    deployment.status.updated_replicas ==
-                    deployment.status.replicas ==
-                    ready_replicas)
-            blocks = self._generate_deployment_rollout_block(deployment,
-                                                             rollout_complete)
-            self.rollouts[deployment_key] = self._send_slack_block(
-                channel=self.rollouts[deployment_key][1],
-                message_id=self.rollouts[deployment_key][0], blocks=blocks)
+        print("Waiting for deployment events to come in..")
+        for event in stream:
+            deployment = event['object']
 
-            if rollout_complete:
-                self.rollouts.pop(deployment_key)
-        elif ready_replicas < deployment.spec.replicas:
-            blocks = self._generate_deployment_degraded_block(deployment)
-            self._send_slack_block(blocks, self.slack_channel)
-            self.degraded.add(deployment_key)
+            # Parse out annotations
+            annotations = deployment.metadata.annotations
 
-        elif (deployment_key in self.degraded and
-              ready_replicas >= deployment.spec.replicas):
-            self.degraded.remove(deployment_key)
-            blocks = self._generate_deployment_not_degraded_block(deployment)
-            self._send_slack_block(blocks, self.slack_channel)
+            # Skip watching this deployment unless we've enabled it explicity
+            if annotations.get(ANNOTATION_ENABLED) != "true":
+                continue
 
-    def _handle_event(self, deployment):
-        self._handle_deployment_change(deployment)
+            # Get team routing information from annotation
+            annotation_team = annotations.get(ANNOTATION_TEAM)
+            annotation_receiver = annotations.get(ANNOTATION_RECEIVER)
 
-    def main_loop(self):
-        while True:
-            self._init_client()
-            pods = self.core.list_deployment_for_all_namespaces(watch=False)
-            resource_version = pods.metadata.resource_version
-            stream = watch.Watch().stream(
-                self.core.list_deployment_for_all_namespaces,
-                resource_version=resource_version
-            )
-            print("Waiting for deployment events to come in..")
-            for event in stream:
-                deployment = event['object']
-                self._handle_event(deployment)
+            print(f"got event for {deployment.metadata.namespace}/{deployment.metadata.name}")
 
-    def _generate_deployment_rollout_block(self, deployment,
-                                           rollout_complete=False):
+            for receiver in receivers:
+                receiver.handle_event(annotation_team, annotation_receiver,
+                                      deployment)
 
-        block = copy(self.template)
-        header = f"*{self.cluster_name} deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" is rolling out an update.*"
-        message = ''
-        for container in deployment.spec.template.spec.containers:
-            message += f"Container {container.name} has image " \
-                f"_ {container.image} _\n"
-        message += "\n"
-        message += f"{deployment.status.updated_replicas} replicas " \
-            f"updated out of " \
-            f"{deployment.spec.replicas}, {deployment.status.ready_replicas}" \
-            f" ready.\n\n"
-        message += _generate_progress_bar(
-            deployment.status.updated_replicas, deployment.spec.replicas)
+def get_images_from_config(image_config):
+    warning_image = image_config.get("warn", os.environ.get("WARNING_IMAGE"))
+    ok_image = image_config.get("ok", os.environ.get("OK_IMAGE"))
+    progress_image = image_config.get("progress",
+                                      os.environ.get("PROGRESS_IMAGE"))
 
-        block[0]['text']['text'] = header
-        block[1]['text']['text'] = message
-        block[1]['accessory']['image_url'] = self.progress_image
-        if rollout_complete:
-            block[1]['accessory'][
-                'image_url'] = self.ok_image
-        return block
-
-    def _generate_deployment_degraded_block(self, deployment):
-
-        block = copy(self.template)
-
-        header = f"*{self.cluster_name} deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has become degraded.*"
-
-        message = f"Deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has {deployment.status.ready_replicas} ready replicas " \
-            f"when it should have {deployment.spec.replicas}.\n"
-
-        message += _generate_progress_bar(deployment.status.ready_replicas,
-                                          deployment.spec.replicas)
-
-        block[0]['text']['text'] = header
-        block[1]['text']['text'] = message
-        block[1]['accessory'][
-            'image_url'] = self.warning_image
-
-        return block
-
-    def _generate_deployment_not_degraded_block(self, deployment):
-        block = copy(self.template)
-
-        header = f"*{self.cluster_name} deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" is no longer in a degraded state.*"
-
-        message = f"Deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has {deployment.status.ready_replicas} ready " \
-            f"replicas out of " \
-            f"{deployment.spec.replicas}.\n"
-
-        message += _generate_progress_bar(deployment.status.ready_replicas,
-                                          deployment.spec.replicas)
-
-        block[0]['text']['text'] = header
-        block[1]['text']['text'] = message
-        block[1]['accessory'][
-            'image_url'] = self.ok_image
-
-        return block
+    return {'ok': ok_image,
+            'warning': warning_image,
+            'progress': progress_image}
 
 
 if __name__ == "__main__":
-    env_warning_image = os.environ.get(
-        "WARNING_IMAGE",
-        "https://upload.wikimedia.org/wikipedia/"
-        "commons/thumb/6/6e/Dialog-warning.svg/"
-        "200px-Dialog-warning.svg.png")
-    env_progress_image = os.environ.get("PROGRESS_IMAGE",
-                                        "https://i.gifer.com/80ZN.gif")
-    env_ok_image = os.environ.get("OK_IMAGE",
-                                  "https://upload.wikimedia.org/wikipedia/"
-                                  "commons/thumb/f/fb/Yes_check.svg/"
-                                  "200px-Yes_check.svg.png")
-    env_slack_token = os.environ["SLACK_TOKEN"]
-    env_slack_channel = os.environ.get("SLACK_CHANNEL", "#general")
-    env_cluster_name = os.environ.get("CLUSTER_NAME", "Kubernetes Cluster")
-    kube_deploy_watch = KubeLookout(env_warning_image,
-                                    env_progress_image,
-                                    env_ok_image, env_slack_token,
-                                    env_slack_channel, env_cluster_name)
 
-    kube_deploy_watch.main_loop()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', required=True,
+                        help='path to configuration file')
+    args = parser.parse_args()
+
+    config_file = args.config
+
+    if not os.path.exists(config_file):
+        print("Config not found: %s" % (config_file))
+        sys.exit(1)
+
+    print("Using config: %s" % (config_file))
+    with open(config_file, 'r') as ymlfile:
+        yaml_config = yaml.safe_load(ymlfile)
+
+    cluster_name = yaml_config.get("cluster_name",
+                                   os.environ.get("CLUSTER_NAME",
+                                                  "Kubernetes Cluster"))
+
+    images = get_images_from_config(yaml_config.get("images", {}))
+
+    receivers = []
+
+    slack_settings = yaml_config.get("receivers", {}).get("slack", {})
+    flowdock_settings = yaml_config.get("receivers", {}).get("flowdock", {})
+
+    for team, settings in slack_settings.items():
+        receivers.append(SlackReceiver(cluster_name,
+                                       team,
+                                       images,
+                                       settings.get("token"),
+                                       settings.get("channel")))
+
+    for team, settings in flowdock_settings.items():
+        receivers.append(FlowdockReceiver(cluster_name,
+                                          team,
+                                          images,
+                                          settings.get("token")))
+
+    if not receivers:
+        print("No valid receivers defined in config.yml")
+        sys.exit(1)
+
+    main_loop(receivers)

@@ -1,0 +1,20 @@
+---
+cluster_name: "Kubernetes Cluster"
+images:
+  ok: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Yes_check.svg/200px-Yes_check.svg.png"
+  warn: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Dialog-warning.svg/200px-Dialog-warning.svg.png"
+  progress: "https://i.gifer.com/80ZN.gif"
+receivers:
+  slack: 
+    myteam:
+      channel: "#test"
+      token: "$LEGACY_SLACK_TOKEN"
+    myteam2:
+      channel: "#random"
+      token: "$LEGACY_SLACK_TOKEN"
+  flowdock:
+    myteam:
+      token: "$FLOWDOCK_TOKEN"
+    myteam2:
+      token: "$FLOWDOCK_TOKEN"
+
