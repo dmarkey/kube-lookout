@@ -1,19 +1,19 @@
-import os
-
-
 class Receiver(object):
 
-    def __init__(self, cluster_name, warning_image, progress_image, ok_image):
+    NAME = "receiver"
+
+    def __init__(self, cluster_name, team, images):
+
         self.cluster_name = cluster_name
-        self.warning_image = warning_image
-        self.ok_image = ok_image
-        self.progress_image = progress_image
+        self.team = team
+        self.warning_image = images['warning']
+        self.ok_image = images['ok']
+        self.progress_image = images['progress']
 
         self.rollouts = {}
         self.degraded = set()
 
         self.channel = None
-
 
     def _handle_deployment_change(self, deployment):
         metadata = deployment.metadata
@@ -59,5 +59,12 @@ class Receiver(object):
             data = self._generate_deployment_not_degraded_message(deployment)
             self._send_message(data)
 
-    def _handle_event(self, deployment):
-        self._handle_deployment_change(deployment)
+    def _should_handle(self, team, receiver):
+        return True if self.team == team and self.NAME == receiver \
+            else False
+
+    def handle_event(self, team, receiver, deployment):
+        if self._should_handle(team, receiver):
+            print("Receiver '%s' handling event for team '%s'" % (receiver,
+                                                                  team))
+            self._handle_deployment_change(deployment)

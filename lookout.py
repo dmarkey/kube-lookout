@@ -15,6 +15,9 @@ def format_constructor(loader, node):
 
 yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
 
+ANNOTATION_ENABLED = "kube-lookout/enabled"
+ANNOTATION_TEAM = "kube-lookout/team"
+ANNOTATION_RECEIVER = "kube-lookout/receiver"
 
 def main_loop(receivers):
 
@@ -29,22 +32,45 @@ def main_loop(receivers):
         pods = core.list_deployment_for_all_namespaces(watch=False)
         resource_version = pods.metadata.resource_version
         stream = watch.Watch().stream(core.list_deployment_for_all_namespaces,
-                                      resource_version=resource_version
-                                      )
+                                      resource_version=resource_version)
 
         print("Waiting for deployment events to come in..")
         for event in stream:
             deployment = event['object']
+
+            # Parse out annotations
+            annotations = deployment.metadata.annotations
+
+            # Skip watching this deployment unless we've enabled it explicity
+            if annotations.get(ANNOTATION_ENABLED) != "true":
+                continue
+
+            # Get team routing information from annotation
+            annotation_team = annotations.get(ANNOTATION_TEAM)
+            annotation_receiver = annotations.get(ANNOTATION_RECEIVER)
+
             print(f"got event for {deployment.metadata.namespace}/{deployment.metadata.name}")
 
             for receiver in receivers:
-                receiver._handle_event(deployment)
+                receiver.handle_event(annotation_team, annotation_receiver,
+                                      deployment)
+
+def get_images_from_config(image_config):
+    warning_image = image_config.get("warn", os.environ.get("WARNING_IMAGE"))
+    ok_image = image_config.get("ok", os.environ.get("OK_IMAGE"))
+    progress_image = image_config.get("progress",
+                                      os.environ.get("PROGRESS_IMAGE"))
+
+    return {'ok': ok_image,
+            'warning': warning_image,
+            'progress': progress_image}
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', required=True, help='path to configuration file')
+    parser.add_argument('--config', required=True,
+                        help='path to configuration file')
     args = parser.parse_args()
 
     config_file = args.config
@@ -57,12 +83,11 @@ if __name__ == "__main__":
     with open(config_file, 'r') as ymlfile:
         yaml_config = yaml.safe_load(ymlfile)
 
-    images = yaml_config.get("images", {})
-    warning_image = images.get("warn", os.environ.get("WARNING_IMAGE")) 
-    ok_image = images.get("ok", os.environ.get("OK_IMAGE"))
-    progress_image = images.get("progress", os.environ.get("PROGRESS_IMAGE"))
+    cluster_name = yaml_config.get("cluster_name",
+                                   os.environ.get("CLUSTER_NAME",
+                                                  "Kubernetes Cluster"))
 
-    cluster_name = yaml_config.get("cluster_name", os.environ.get("CLUSTER_NAME", "Kubernetes Cluster"))
+    images = get_images_from_config(yaml_config.get("images", {}))
 
     receivers = []
 
@@ -71,17 +96,15 @@ if __name__ == "__main__":
 
     for team, settings in slack_settings.items():
         receivers.append(SlackReceiver(cluster_name,
-                                       warning_image,
-                                       progress_image,
-                                       ok_image,
+                                       team,
+                                       images,
                                        settings.get("token"),
                                        settings.get("channel")))
 
     for team, settings in flowdock_settings.items():
         receivers.append(FlowdockReceiver(cluster_name,
-                                          warning_image,
-                                          progress_image,
-                                          ok_image,
+                                          team,
+                                          images,
                                           settings.get("token")))
 
     if not receivers:
