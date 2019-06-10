@@ -8,5 +8,5 @@ RUN pip install pipenv \
         && rm -rf /var/lib/apt/lists/*
 
 USER nobody
-ENTRYPOINT  [ "python", "/app/lookout.py" ]
+ENTRYPOINT  [ "python", "-u", "/app/lookout.py" ]
 CMD [ "--config=/etc/kube-lookout/config.yml "]
