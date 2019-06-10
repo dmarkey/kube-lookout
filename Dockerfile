@@ -1,5 +1,12 @@
-FROM alpine:3.9
-ADD requirements.txt /tmp
-RUN apk update &&  apk add libffi openssl python3 && apk add gcc musl-dev python3-dev libffi-dev openssl-dev && pip3 install -r /tmp/requirements.txt  && apk del openssl-dev libffi-dev python3-dev musl-dev gcc && rm -f /var/cache/apk/*
-ADD lookout.py /root
-ENTRYPOINT  ["python3", "-u", "/root/lookout.py"]
+FROM python:3.7-slim-stretch
+
+WORKDIR /app
+COPY . ./
+
+RUN pip install pipenv \
+	&& pipenv install --system --deploy \
+        && rm -rf /var/lib/apt/lists/*
+
+USER nobody
+ENTRYPOINT  [ "python", "/app/lookout.py" ]
+CMD [ "--config=/etc/kube-lookout/config.yml "]
