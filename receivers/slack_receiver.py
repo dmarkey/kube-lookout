@@ -4,7 +4,11 @@ import slack
 
 from .receiver import Receiver
 
+
 class SlackReceiver(Receiver):
+
+    NAME = "slack"
+
     template = [
         {
             "type": "section",
@@ -27,12 +31,10 @@ class SlackReceiver(Receiver):
         }
     ]
 
-    def __init__(self, cluster_name, warning_image, progress_image, ok_image,
-                 slack_key, channel):
-
-        super().__init__(cluster_name, warning_image, progress_image, ok_image)
-
+    def __init__(self, cluster_name, team, images, slack_key, channel):
+        super().__init__(cluster_name, team, images)
         self.slack_client = None
+        self.team = team
         self.slack_key = slack_key
         self.channel = channel
 

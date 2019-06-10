@@ -5,6 +5,9 @@ from .receiver import Receiver
 
 
 class FlowdockReceiver(Receiver):
+
+    NAME = "flowdock"
+
     template = {
         "author": {
             "name": "KubeLookout",
@@ -22,11 +25,8 @@ class FlowdockReceiver(Receiver):
         }
     }
 
-    def __init__(self, cluster_name, warning_image, progress_image, ok_image,
-                 flowdock_token):
-
-        super().__init__(cluster_name, warning_image, progress_image, ok_image)
-
+    def __init__(self, cluster_name, team, images, flowdock_token):
+        super().__init__(cluster_name, team, images)
         self.flowdock_client = None
         self.flowdock_token = flowdock_token
         self.channel = "fake-not-used-yet-as-tied-to-token"
@@ -41,7 +41,8 @@ class FlowdockReceiver(Receiver):
         item = data.get("thread")
 
         if self.flowdock_client is None:
-            self.flowdock_client = flowdock.connect(flow_token=self.flowdock_token)
+            self.flowdock_client = flowdock.connect(
+                flow_token=self.flowdock_token)
 
         if message_id is None:
             # Send a new message
@@ -51,13 +52,15 @@ class FlowdockReceiver(Receiver):
             return item_id, item_id
 
         # Update exiting message
-        response = self.flowdock_client.present(item_id, author=author, title=title, body=item['body'], thread=item)
+        response = self.flowdock_client.present(item_id, author=author,
+                                                title=title, body=item['body'],
+                                                thread=item)
 
         # FIXME - this is not ideal
         return item_id, item_id
 
     def _generate_deployment_rollout_message(self, deployment,
-                                            rollout_complete=False):
+                                             rollout_complete=False):
 
         header = f"{self.cluster_name.upper()}: deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}"
