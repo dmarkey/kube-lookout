@@ -13,6 +13,20 @@ ANNOTATION_ENABLED = "kube-lookout/enabled"
 ANNOTATION_TEAM = "kube-lookout/team"
 ANNOTATION_RECEIVER = "kube-lookout/receiver"
 
+
+#
+# Define a specific yaml loader which substitutes environment
+# vars.
+#
+class YamlEnvLoader(yaml.SafeLoader):
+    def construct_yaml_str(self, node):
+        return self.construct_scalar(node).format(**os.environ)
+
+YamlEnvLoader.add_constructor(
+    'tag:yaml.org,2002:str',
+    YamlEnvLoader.construct_yaml_str)
+
+
 def main_loop(receivers):
 
     if "KUBERNETES_PORT" in os.environ:
@@ -21,11 +35,6 @@ def main_loop(receivers):
         config.load_kube_config()
     api_client = client.api_client.ApiClient()
     core = client.ExtensionsV1beta1Api(api_client)
-
-    def format_constructor(loader, node):
-        return loader.construct_scalar(node).format(**os.environ)
-
-    yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
 
     event_types = ['ADDED', 'MODIFIED']
 
@@ -77,6 +86,9 @@ def get_images_from_config(image_config):
             'warning': warning_image,
             'progress': progress_image}
 
+def format_constructor(loader, node):
+    return loader.construct_scalar(node).format(**os.environ)
+
 
 if __name__ == "__main__":
 
@@ -93,8 +105,14 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("Using config: %s" % (config_file))
+
     with open(config_file, 'r') as ymlfile:
-        yaml_config = yaml.safe_load(ymlfile)
+        yaml_loader = YamlEnvLoader(ymlfile)
+        try:
+            #return loader.get_single_data()
+            yaml_config = yaml_loader.get_single_data()
+        finally:
+            yaml_loader.dispose()
 
     cluster_name = yaml_config.get("cluster_name",
                                    os.environ.get("CLUSTER_NAME",
