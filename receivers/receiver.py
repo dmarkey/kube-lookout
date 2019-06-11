@@ -11,7 +11,6 @@ class Receiver(object):
         self.progress_image = images['progress']
 
         self.rollouts = {}
-        self.degraded = set()
 
         self.channel = None
 
@@ -22,43 +21,31 @@ class Receiver(object):
         ready_replicas = int(deployment.status.ready_replicas) \
             if deployment.status.ready_replicas else 0
 
-        if deployment_key not in self.rollouts and \
-                deployment.status.updated_replicas is None:
-            data = self._generate_deployment_rollout_message(deployment,
-                                                             True)
-            resp = self._send_message(data, new_resource)
-            self.rollouts[deployment_key] = resp
+        rollout_complete = (
+                deployment.status.updated_replicas ==
+                deployment.status.replicas ==
+                ready_replicas)
 
-        elif deployment_key in self.rollouts:
-            rollout_complete = (
-                    deployment.status.updated_replicas ==
-                    deployment.status.replicas ==
-                    ready_replicas)
+        if new_resource:
+            data = self._generate_deployment_rollout_message(deployment, True)
+            self.rollouts[deployment_key] = self._send_message(data, new_resource)
 
-            data = self._generate_deployment_rollout_message(deployment,
-                                                             False,
-                                                             rollout_complete)
+        elif rollout_complete:
+            data = self._generate_deployment_rollout_message(deployment, False, True)
 
-            self.rollouts[deployment_key] = self._send_message(
+            self._send_message(
                 data,
                 new_resource,
-                # FIXME: This isn't ideal for flowdock yet.
                 channel=self.rollouts[deployment_key][1],
                 message_id=self.rollouts[deployment_key][0])
 
-            if rollout_complete:
-                self.rollouts.pop(deployment_key)
+            self.rollouts.pop(deployment_key)
 
         elif ready_replicas < deployment.spec.replicas:
             data = self._generate_deployment_degraded_message(deployment)
-            self._send_message(data, False)
-            self.degraded.add(deployment_key)
-
-        elif (deployment_key in self.degraded and
-              ready_replicas >= deployment.spec.replicas):
-            self.degraded.remove(deployment_key)
-            data = self._generate_deployment_not_degraded_message(deployment)
-            self._send_message(data, False)
+            self._send_message(data, new_resource,
+                channel=self.rollouts[deployment_key][1],
+                message_id=self.rollouts[deployment_key][0])
 
     def _should_handle(self, team, receiver):
         return True if self.team == team and self.NAME == receiver \

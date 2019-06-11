@@ -126,31 +126,3 @@ class FlowdockReceiver(Receiver):
         data['resource_uid'] = deployment.metadata.uid
 
         return data
-
-    def _generate_deployment_not_degraded_message(self, deployment):
-
-        ready_replicas = int(deployment.status.ready_replicas) \
-            if deployment.status.ready_replicas else 0
-
-        replicas = f"{ready_replicas}/{deployment.spec.replicas}"
-
-        header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}"
-
-        message = f"Deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has {ready_replicas} ready " \
-            f"replicas out of " \
-            f"{deployment.spec.replicas}.<br>"
-
-        data = copy(self.template)
-        data["title"] = header
-        data["thread"]["title"] = header
-        data["thread"]["body"] = message
-
-        data["thread"]["status"]["value"] = 'DEPLOYED'
-        data["thread"]["status"]["color"] = 'green'
-
-        data['resource_uid'] = deployment.metadata.uid
-
-        return data
