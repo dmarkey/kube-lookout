@@ -22,18 +22,18 @@ class Receiver(object):
         ready_replicas = int(deployment.status.ready_replicas) \
             if deployment.status.ready_replicas else 0
 
-        rollout_complete = (
-                deployment.status.updated_replicas ==
-                deployment.status.replicas ==
-                ready_replicas)
-
-        if deployment_key not in self.rollouts:
+        if deployment_key not in self.rollouts and \
+                deployment.status.updated_replicas is None:
             data = self._generate_deployment_rollout_message(deployment,
                                                              True)
             resp = self._send_message(data, new_resource)
             self.rollouts[deployment_key] = resp
 
-        elif deployment_key in self.rollouts and rollout_complete:
+        elif deployment_key in self.rollouts:
+            rollout_complete = (
+                    deployment.status.updated_replicas ==
+                    deployment.status.replicas ==
+                    ready_replicas)
 
             data = self._generate_deployment_rollout_message(deployment,
                                                              False,
@@ -46,7 +46,8 @@ class Receiver(object):
                 channel=self.rollouts[deployment_key][1],
                 message_id=self.rollouts[deployment_key][0])
 
-            self.rollouts.pop(deployment_key)
+            if rollout_complete:
+                self.rollouts.pop(deployment_key)
 
         elif ready_replicas < deployment.spec.replicas:
             data = self._generate_deployment_degraded_message(deployment)
@@ -57,7 +58,7 @@ class Receiver(object):
               ready_replicas >= deployment.spec.replicas):
             self.degraded.remove(deployment_key)
             data = self._generate_deployment_not_degraded_message(deployment)
-            self._send_message(data, Falsef)
+            self._send_message(data, False)
 
     def _should_handle(self, team, receiver):
         return True if self.team == team and self.NAME == receiver \
