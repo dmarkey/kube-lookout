@@ -27,6 +27,8 @@ def main_loop(receivers):
 
     yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
 
+    event_types = ['ADDED', 'MODIFIED']
+
     while True:
         pods = core.list_deployment_for_all_namespaces(watch=False)
         resource_version = pods.metadata.resource_version
@@ -35,7 +37,14 @@ def main_loop(receivers):
 
         print("Waiting for deployment events to come in..")
         for event in stream:
+            # Event type
+            # ADDED | MODIFIED | DELETED
+            event_type = event['type']
             deployment = event['object']
+
+            # We only care about new/updated events (for now)
+            if event_type not in event_types:
+                continue
 
             # Parse out annotations
             annotations = deployment.metadata.annotations
@@ -50,9 +59,13 @@ def main_loop(receivers):
 
             print(f"got event for {deployment.metadata.namespace}/{deployment.metadata.name}")
 
+            new_resource = True if event_type == 'ADDED' else False
+
             for receiver in receivers:
-                receiver.handle_event(annotation_team, annotation_receiver,
-                                      deployment)
+                receiver.handle_event(annotation_team,
+                                      annotation_receiver,
+                                      deployment,
+                                      new_resource)
 
 def get_images_from_config(image_config):
     warning_image = image_config.get("warn", os.environ.get("WARNING_IMAGE"))
@@ -70,6 +83,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True,
                         help='path to configuration file')
+
     args = parser.parse_args()
 
     config_file = args.config

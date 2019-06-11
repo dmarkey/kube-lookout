@@ -31,9 +31,9 @@ class FlowdockReceiver(Receiver):
         self.flowdock_token = flowdock_token
         self.channel = "fake-not-used-yet-as-tied-to-token"
 
-        print("configured flow-receiver for %s" % (self.flowdock_token))
+        print("configured flow-receiver for %s" % (self.team))
 
-    def _send_message(self, data, channel=None, message_id=None):
+    def _send_message(self, data, new_resource, channel=None, message_id=None):
         # FIXME: channel not used here
         item_id = data.get('resource_uid')
         author = data.get('author')
@@ -46,38 +46,45 @@ class FlowdockReceiver(Receiver):
 
         if message_id is None:
             # Send a new message
-            response = self.flowdock_client.present(item_id, author=author, title=title, thread=item)
-
+            response = self.flowdock_client.present(item_id, author=author,
+                                                    title=title, body=item['body'], thread=item)
             # FIXME - this is not ideal
             return item_id, item_id
 
         # Update exiting message
         response = self.flowdock_client.present(item_id, author=author,
-                                                title=title, body=item['body'],
+                                                title=title,
+                                                body=item['body'],
                                                 thread=item)
 
         # FIXME - this is not ideal
         return item_id, item_id
 
     def _generate_deployment_rollout_message(self, deployment,
+                                             new_resource,
                                              rollout_complete=False):
 
-        header = f"{self.cluster_name.upper()}: deployment " \
-            f"{deployment.metadata.namespace}/{deployment.metadata.name}"
+        data = copy(self.template)
 
         message = ''
-        for container in deployment.spec.template.spec.containers:
-            message += f"Container {container.name} has image " \
-                f"<b>{container.image}</b>"
+        if new_resource:
+            message += f"<b>New</b> deployment started at {deployment.metadata.creation_timestamp}</br></br>"
+        else:
+            for container in deployment.spec.template.spec.containers:
+                message += f"Container {container.name} has image " \
+                    f"<b>{container.image}</b>"
 
-        message += "<br>"
-        message += f"{deployment.status.updated_replicas} replicas " \
-            f"updated out of " \
-            f"{deployment.spec.replicas}, {deployment.status.ready_replicas}" \
-            f" ready.<br><br."
+            message += "<br>"
+            message += f"{deployment.status.updated_replicas} replicas " \
+                f"updated out of " \
+                f"{deployment.spec.replicas}, {deployment.status.ready_replicas}" \
+                f" ready.<br><br."
 
-        data = copy(self.template)
-        data["title"] = header
+        replicas = f"{deployment.status.ready_replicas}/{deployment.spec.replicas}"
+
+        header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
+            f"{deployment.metadata.namespace}/{deployment.metadata.name}"
+
         data["thread"]["title"] = header
         data["thread"]["body"] = message
 
@@ -89,11 +96,15 @@ class FlowdockReceiver(Receiver):
             data["thread"]["status"]["color"] = 'blue'
 
         data['resource_uid'] = deployment.metadata.uid
+
         return data
 
     def _generate_deployment_degraded_message(self, deployment):
 
-        header = f"{self.cluster_name.upper()}: deployment " \
+
+        replicas = f"{deployment.status.ready_replicas}/{deployment.spec.replicas}"
+
+        header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}"
 
         message = f"Deployment " \
@@ -104,16 +115,20 @@ class FlowdockReceiver(Receiver):
         data = copy(self.template)
         data["title"] = header
         data["thread"]["title"] = header
-        data["thread"]["body"]= message
+        data["thread"]["body"] = message
 
         data["thread"]["status"]["value"] = 'DEGRADED'
         data["thread"]["status"]["color"] = 'red'
+
+        data['resource_uid'] = deployment.metadata.uid
 
         return data
 
     def _generate_deployment_not_degraded_message(self, deployment):
 
-        header = f"{self.cluster_name.upper()}: deployment " \
+        replicas = f"{deployment.status.ready_replicas}/{deployment.spec.replicas}"
+
+        header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}"
 
         message = f"Deployment " \
@@ -129,5 +144,7 @@ class FlowdockReceiver(Receiver):
 
         data["thread"]["status"]["value"] = 'DEPLOYED'
         data["thread"]["status"]["color"] = 'green'
+
+        data['resource_uid'] = deployment.metadata.uid
 
         return data
