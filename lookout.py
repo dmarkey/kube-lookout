@@ -9,12 +9,6 @@ from receivers.slack_receiver import SlackReceiver
 from receivers.flowdock_receiver import FlowdockReceiver
 
 
-def format_constructor(loader, node):
-    return loader.construct_scalar(node).format(**os.environ)
-
-
-yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
-
 ANNOTATION_ENABLED = "kube-lookout/enabled"
 ANNOTATION_TEAM = "kube-lookout/team"
 ANNOTATION_RECEIVER = "kube-lookout/receiver"
@@ -27,6 +21,11 @@ def main_loop(receivers):
         config.load_kube_config()
     api_client = client.api_client.ApiClient()
     core = client.ExtensionsV1beta1Api(api_client)
+
+    def format_constructor(loader, node):
+        return loader.construct_scalar(node).format(**os.environ)
+
+    yaml.SafeLoader.add_constructor(u'tag:yaml.org,2002:str', format_constructor)
 
     while True:
         pods = core.list_deployment_for_all_namespaces(watch=False)
