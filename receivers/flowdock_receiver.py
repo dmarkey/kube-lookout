@@ -33,7 +33,7 @@ class FlowdockReceiver(Receiver):
 
         print("configured flow-receiver for %s" % (self.team))
 
-    def _send_message(self, data, new_resource, channel=None, message_id=None):
+    def _send_message(self, data, channel=None, message_id=None):
         # FIXME: channel not used here
         item_id = data.get('resource_uid')
         author = data.get('author')

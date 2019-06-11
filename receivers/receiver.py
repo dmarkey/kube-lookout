@@ -14,7 +14,7 @@ class Receiver(object):
 
         self.channel = None
 
-    def _handle_deployment_change(self, deployment, new_resource):
+    def _handle_deployment_change(self, deployment, new_resource=False):
         metadata = deployment.metadata
         deployment_key = f"{metadata.namespace}/{metadata.name}"
 
@@ -28,14 +28,14 @@ class Receiver(object):
 
         if new_resource:
             data = self._generate_deployment_rollout_message(deployment, True)
-            self.rollouts[deployment_key] = self._send_message(data, new_resource)
+            self.rollouts[deployment_key] = self._send_message(data, channel=self.channel)
+            print(self.rollouts)
 
         elif rollout_complete:
             data = self._generate_deployment_rollout_message(deployment, False, True)
 
             self._send_message(
                 data,
-                new_resource,
                 channel=self.rollouts[deployment_key][1],
                 message_id=self.rollouts[deployment_key][0])
 
@@ -43,7 +43,7 @@ class Receiver(object):
 
         elif ready_replicas < deployment.spec.replicas:
             data = self._generate_deployment_degraded_message(deployment)
-            self._send_message(data, new_resource,
+            self._send_message(data,
                 channel=self.rollouts[deployment_key][1],
                 message_id=self.rollouts[deployment_key][0])
 

@@ -41,13 +41,13 @@ class SlackReceiver(Receiver):
         print("configured slack-receiver for %s/%s" % (self.team,
               self.channel))
 
-    def _send_message(self, data, new_resource, channel=None, message_id=None):
+    def _send_message(self, data, channel=None, message_id=None):
         if self.slack_client is None:
             self.slack_client = slack.WebClient(
                 self.slack_key)
 
         if message_id is None:
-            response = self.slack_client.chat_postMessage(channel=self.channel,
+            response = self.slack_client.chat_postMessage(channel=channel,
                                                           blocks=data)
         else:
             response = self.slack_client.chat_update(channel=channel,
