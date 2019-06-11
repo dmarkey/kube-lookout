@@ -1,41 +1,48 @@
 from unittest.mock import Mock
 
-from lookout import KubeLookout
+from receivers.slack_receiver import SlackReceiver
+from receivers.flowdock_receiver import FlowdockReceiver
 
 
-def test__init():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+def mock_images():
+    return {'ok': 'ok.png',
+            'warning': 'warning.png',
+            'progress': 'progress.png'}
+
+def test_slack_init():
+
+    team = "teambobo"
     slack_key = "slack_key"
     slack_channel = "slack_channel"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
+    images = mock_images()
 
-    assert klo.slack_channel == slack_channel
-    assert klo.ok_image == ok_image
-    assert klo.warning_image == warning_image
-    assert klo.progress_image == progress_image
-    assert klo.slack_key == slack_key
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
+
     assert klo.cluster_name == cluster_name
+    assert klo.team == team
+    assert klo.slack_key == slack_key
+    assert klo.channel == slack_channel
+
+    assert klo.ok_image == images['ok']
+    assert klo.warning_image == images['warning']
+    assert klo.progress_image == images['progress']
 
 
 def test_send_slack_block():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+    team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "slack_channel"
+    slack_channel = "#general"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
+    images = mock_images()
+
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
 
     mock_result = Mock()
     mock_result.data = {"ts": 123, "channel": "lala"}
     klo.slack_client = Mock()
     klo.slack_client.chat_postMessage = Mock(return_value=mock_result)
-    result = klo._send_slack_block({"the": "block"}, "#general")
+    result = klo._send_message({"the": "block"}, "#general")
     assert result[0] == 123
     assert result[1] == "lala"
     klo.slack_client.chat_postMessage.assert_called_once_with(
@@ -43,20 +50,19 @@ def test_send_slack_block():
 
 
 def test_send_slack_block_channel_id():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+    team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "slack_channel"
+    slack_channel = "#general"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
+    images = mock_images()
+
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
 
     mock_result = Mock()
     mock_result.data = {"ts": 123, "channel": "lala"}
     klo.slack_client = Mock()
     klo.slack_client.chat_update = Mock(return_value=mock_result)
-    result = klo._send_slack_block({"the": "block"}, "#general", 234)
+    result = klo._send_message({"the": "block"}, "#general", 234)
     assert result[0] == 123
     assert result[1] == "lala"
     klo.slack_client.chat_update.assert_called_once_with(
@@ -64,15 +70,14 @@ def test_send_slack_block_channel_id():
 
 
 def test_deployment_rollout():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+    team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "slack_channel"
+    slack_channel = "#general"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
-    klo._send_slack_block = Mock(return_value=("1", "2"))
+    images = mock_images()
+
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
+    klo._send_message = Mock(return_value=("1", "2"))
 
     deployment = Mock()
 
@@ -88,10 +93,12 @@ def test_deployment_rollout():
     container2.name = "bar"
     deployment.spec.template.spec.containers = [container1, container2]
     deployment.spec.replicas = 2
-    klo._handle_deployment_change(deployment)
+    klo._handle_deployment_change(deployment, True)
 
     assert klo.rollouts == {'test/test_deploy': ('1', '2')}
-    klo._send_slack_block.assert_called_once_with(
+
+
+    klo._send_message.assert_called_once_with(
         [{'type': 'section',
           'text': {'type': 'mrkdwn',
                    'text': '*bobo deployment test/test_deploy is rolling out an update.*'}},
@@ -102,14 +109,14 @@ def test_deployment_rollout():
               'type': 'image',
               'image_url': 'progress.png',
               'alt_text': 'status image'}}]
-        , 'slack_channel')
+        , channel='#general')
 
     deployment.status.updated_replicas = 2
     deployment.status.ready_replicas = 2
     deployment.status.replicas = 2
     klo._send_slack_block = Mock(return_value=("1", "2"))
     klo._handle_deployment_change(deployment)
-    klo._send_slack_block.assert_called_once_with(blocks=[{'type': 'section',
+    klo._send_message.assert_called_once_with(blocks=[{'type': 'section',
                                                            'text': {
                                                                'type': 'mrkdwn',
                                                                'text': '*bobo deployment test/test_deploy is rolling out an update.*'}},
@@ -127,15 +134,14 @@ def test_deployment_rollout():
 
 
 def test_nothing_happening():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+    team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "slack_channel"
+    slack_channel = "#general"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
-    klo._send_slack_block = Mock(return_value=("1", "2"))
+    images = mock_images()
+
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
+    klo._send_message = Mock(return_value=("1", "2"))
 
     deployment = Mock()
 
@@ -155,19 +161,19 @@ def test_nothing_happening():
     deployment.spec.replicas = 2
     klo._handle_deployment_change(deployment)
     assert klo.rollouts == {}
-    klo._send_slack_block.assert_not_called()
+    klo._send_message.assert_not_called()
 
 
 def test_degrade():
-    warning_image = "warning.png"
-    ok_image = "ok.png"
-    progress_image = "progress.png"
+    team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "slack_channel"
+    slack_channel = "#general"
     cluster_name = "bobo"
-    klo = KubeLookout(warning_image, progress_image, ok_image,
-                      slack_key, slack_channel, cluster_name)
-    klo._send_slack_block = Mock(return_value=("1", "2"))
+    images = mock_images()
+
+    klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
+
+    klo._send_message = Mock(return_value=("1", "2"))
 
     deployment = Mock()
 
@@ -187,7 +193,7 @@ def test_degrade():
     deployment.spec.replicas = 2
     klo._handle_deployment_change(deployment)
     assert klo.rollouts == {}
-    klo._send_slack_block.assert_called_once_with([{'type': 'section',
+    klo._send_message.assert_called_once_with([{'type': 'section',
                                                     'text': {'type': 'mrkdwn',
                                                              'text': '*bobo deployment test/test_deploy has become degraded.*'}},
                                                    {'type': 'section',
@@ -199,11 +205,11 @@ def test_degrade():
                                                         'alt_text': 'status image'}}],
                                                   'slack_channel')
     assert klo.degraded == {"test/test_deploy"}
-    klo._send_slack_block = Mock(return_value=("1", "2"))
+    klo._send_message = Mock(return_value=("1", "2"))
     deployment.status.ready_replicas = 2
     klo._handle_deployment_change(deployment)
     assert klo.degraded == set()
-    klo._send_slack_block.assert_called_once_with([{'type': 'section',
+    klo._send_message.assert_called_once_with([{'type': 'section',
                                                     'text': {'type': 'mrkdwn',
                                                              'text': '*bobo deployment test/test_deploy is no longer in a degraded state.*'}},
                                                    {'type': 'section',
