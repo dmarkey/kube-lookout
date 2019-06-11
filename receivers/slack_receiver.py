@@ -38,9 +38,10 @@ class SlackReceiver(Receiver):
         self.slack_key = slack_key
         self.channel = channel
 
-        print("configured slack-receiver for %s" % (self.channel))
+        print("configured slack-receiver for %s/%s" % (self.team,
+              self.channel))
 
-    def _send_message(self, data, channel=None, message_id=None):
+    def _send_message(self, data, new_resource, channel=None, message_id=None):
         if self.slack_client is None:
             self.slack_client = slack.WebClient(
                 self.slack_key)
@@ -56,6 +57,7 @@ class SlackReceiver(Receiver):
         return response.data['ts'], response.data['channel']
 
     def _generate_deployment_rollout_message(self, deployment,
+                                             new_resource,
                                              rollout_complete=False):
 
         block = copy(self.template)
