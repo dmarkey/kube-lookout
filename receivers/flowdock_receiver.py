@@ -39,6 +39,7 @@ class FlowdockReceiver(Receiver):
         author = data.get('author')
         title = "deploy monitor"
         item = data.get("thread")
+        data['external_thread_id'] = item_id
 
         if self.flowdock_client is None:
             self.flowdock_client = flowdock.connect(
@@ -101,15 +102,17 @@ class FlowdockReceiver(Receiver):
 
     def _generate_deployment_degraded_message(self, deployment):
 
+        ready_replicas = int(deployment.status.ready_replicas) \
+            if deployment.status.ready_replicas else 0
 
-        replicas = f"{deployment.status.ready_replicas}/{deployment.spec.replicas}"
+        replicas = f"{ready_replicas}/{deployment.spec.replicas}"
 
         header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}"
 
         message = f"Deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has {deployment.status.ready_replicas} ready replicas " \
+            f" has {ready_replicas} ready replicas " \
             f"when it should have {deployment.spec.replicas}.<br>"
 
         data = copy(self.template)
@@ -126,14 +129,17 @@ class FlowdockReceiver(Receiver):
 
     def _generate_deployment_not_degraded_message(self, deployment):
 
-        replicas = f"{deployment.status.ready_replicas}/{deployment.spec.replicas}"
+        ready_replicas = int(deployment.status.ready_replicas) \
+            if deployment.status.ready_replicas else 0
+
+        replicas = f"{ready_replicas}/{deployment.spec.replicas}"
 
         header = f"[{replicas}] {self.cluster_name.upper()}: deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}"
 
         message = f"Deployment " \
             f"{deployment.metadata.namespace}/{deployment.metadata.name}" \
-            f" has {deployment.status.ready_replicas} ready " \
+            f" has {ready_replicas} ready " \
             f"replicas out of " \
             f"{deployment.spec.replicas}.<br>"
 

@@ -19,13 +19,8 @@ class Receiver(object):
         metadata = deployment.metadata
         deployment_key = f"{metadata.namespace}/{metadata.name}"
 
-        ready_replicas = 0
-
-        if deployment.status.ready_replicas is None:
-            # Can we skip this? It's really verbose otherwise!
-            return
-        else:
-            ready_replicas = deployment.status.ready_replicas
+        ready_replicas = int(deployment.status.ready_replicas) \
+            if deployment.status.ready_replicas else 0
 
         rollout_complete = (
                 deployment.status.updated_replicas ==
@@ -33,13 +28,13 @@ class Receiver(object):
                 ready_replicas)
 
         if deployment_key not in self.rollouts:
-            data = self._generate_deployment_rollout_message(deployment, 
+            data = self._generate_deployment_rollout_message(deployment,
                                                              True)
             resp = self._send_message(data, new_resource)
             self.rollouts[deployment_key] = resp
 
         elif deployment_key in self.rollouts and rollout_complete:
-           
+
             data = self._generate_deployment_rollout_message(deployment,
                                                              False,
                                                              rollout_complete)
