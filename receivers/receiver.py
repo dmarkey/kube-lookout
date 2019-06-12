@@ -32,13 +32,10 @@ class Receiver(object):
                 deployment.status.updated_replicas is None:
             # This is a new deployment
             blocks = self._generate_deployment_rollout_message(deployment)
-            print("AAA")
             self.rollouts[deployment_key] = self._send_message(
                 channel=self.channel, data=blocks)
         elif ready_replicas < deployment.spec.replicas:
             # The deployment is degraded (less replicas than expected)
-            print("BBB")
-
             blocks = self._generate_deployment_degraded_message(deployment)
             self._send_message(
                 channel=self.rollouts[deployment_key][1],
@@ -49,7 +46,6 @@ class Receiver(object):
         elif (deployment_key in self.degraded and
               ready_replicas >= deployment.spec.replicas):
             # The deployment iwas degraded, but isn't any longer
-            print("CC")
             self.degraded.remove(deployment_key)
             blocks = self._generate_deployment_not_degraded_message(deployment)
 
@@ -60,7 +56,6 @@ class Receiver(object):
         # FIXME: We can probably skip this
         if deployment_key in self.rollouts and rollout_complete:
             # The deployment is complete and OK
-            print("DD")
             blocks = self._generate_deployment_rollout_message(deployment, rollout_complete)
             self._send_message(
                 channel=self.rollouts[deployment_key][1],
