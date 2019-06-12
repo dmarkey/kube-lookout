@@ -93,12 +93,12 @@ def test_deployment_rollout():
     container2.name = "bar"
     deployment.spec.template.spec.containers = [container1, container2]
     deployment.spec.replicas = 2
-    klo._handle_deployment_change(deployment, True)
+    klo._handle_deployment_change(deployment)
 
     assert klo.rollouts == {'test/test_deploy': ('1', '2')}
 
     klo._send_message.assert_called_once_with(
-        [{'type': 'section',
+        channel='slack_channel', data=[{'type': 'section',
           'text': {'type': 'mrkdwn',
                    'text': '*bobo deployment test/test_deploy is rolling out an update.*'}},
          {'type': 'section',
@@ -107,8 +107,8 @@ def test_deployment_rollout():
           'accessory': {
               'type': 'image',
               'image_url': 'progress.png',
-              'alt_text': 'status image'}}]
-        , 'slack_channel')
+              'alt_text': 'status image'}}])
+
 
     deployment.status.updated_replicas = 2
     deployment.status.ready_replicas = 2
@@ -164,6 +164,7 @@ def test_nothing_happening():
 
 
 def test_degrade():
+
     team = "teambobo"
     slack_key = "slack_key"
     slack_channel = "slack_channel"
@@ -171,7 +172,6 @@ def test_degrade():
     images = mock_images()
 
     klo = SlackReceiver(cluster_name, team, images, slack_key, slack_channel)
-
     klo._send_message = Mock(return_value=("1", "2"))
 
     deployment = Mock()
@@ -188,11 +188,14 @@ def test_degrade():
     container1.name = "foo"
     container2 = Mock(image="barmage")
     container2.name = "bar"
+
     deployment.spec.template.spec.containers = [container1, container2]
     deployment.spec.replicas = 2
+    klo.rollouts = {"test/test_deploy": ("1", "2")}
+
     klo._handle_deployment_change(deployment)
-    assert klo.rollouts == {}
-    klo._send_message.assert_called_once_with([{'type': 'section',
+
+    klo._send_message.assert_called_once_with(data=[{'type': 'section',
                                                     'text': {'type': 'mrkdwn',
                                                              'text': '*bobo deployment test/test_deploy has become degraded.*'}},
                                                    {'type': 'section',
@@ -202,21 +205,5 @@ def test_degrade():
                                                         'type': 'image',
                                                         'image_url': 'warning.png',
                                                         'alt_text': 'status image'}}],
-                                                  'slack_channel')
-
+                                                channel='2', message_id='1')
     assert klo.degraded == {"test/test_deploy"}
-    klo._send_message = Mock(return_value=("1", "2"))
-    deployment.status.ready_replicas = 2
-    klo._handle_deployment_change(deployment)
-    assert klo.degraded == set()
-    klo._send_message.assert_called_once_with([{'type': 'section',
-                                                    'text': {'type': 'mrkdwn',
-                                                             'text': '*bobo deployment test/test_deploy is no longer in a degraded state.*'}},
-                                                   {'type': 'section',
-                                                    'text': {'type': 'mrkdwn',
-                                                             'text': 'Deployment test/test_deploy has 2 ready replicas out of 2.\n⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛\n'},
-                                                    'accessory': {
-                                                        'type': 'image',
-                                                        'image_url': 'ok.png',
-                                                        'alt_text': 'status image'}}],
-                                                  'slack_channel')
