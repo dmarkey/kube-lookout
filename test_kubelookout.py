@@ -1,13 +1,14 @@
 from unittest.mock import Mock
 
 from receivers.slack_receiver import SlackReceiver
-from receivers.flowdock_receiver import FlowdockReceiver
+# from receivers.flowdock_receiver import FlowdockReceiver
 
 
 def mock_images():
     return {'ok': 'ok.png',
             'warning': 'warning.png',
             'progress': 'progress.png'}
+
 
 def test_slack_init():
 
@@ -109,7 +110,6 @@ def test_deployment_rollout():
               'image_url': 'progress.png',
               'alt_text': 'status image'}}])
 
-
     deployment.status.updated_replicas = 2
     deployment.status.ready_replicas = 2
     deployment.status.replicas = 2
@@ -191,6 +191,7 @@ def test_degrade():
 
     deployment.spec.template.spec.containers = [container1, container2]
     deployment.spec.replicas = 2
+
     klo.rollouts = {"test/test_deploy": ("1", "2")}
 
     klo._handle_deployment_change(deployment)

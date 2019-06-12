@@ -22,6 +22,7 @@ class YamlEnvLoader(yaml.SafeLoader):
     def construct_yaml_str(self, node):
         return self.construct_scalar(node).format(**os.environ)
 
+
 YamlEnvLoader.add_constructor(
     'tag:yaml.org,2002:str',
     YamlEnvLoader.construct_yaml_str)
@@ -76,6 +77,7 @@ def main_loop(receivers):
                                       deployment,
                                       new_resource)
 
+
 def get_images_from_config(image_config):
     warning_image = image_config.get("warn", os.environ.get("WARNING_IMAGE"))
     ok_image = image_config.get("ok", os.environ.get("OK_IMAGE"))
@@ -85,6 +87,7 @@ def get_images_from_config(image_config):
     return {'ok': ok_image,
             'warning': warning_image,
             'progress': progress_image}
+
 
 def format_constructor(loader, node):
     return loader.construct_scalar(node).format(**os.environ)
@@ -109,7 +112,6 @@ if __name__ == "__main__":
     with open(config_file, 'r') as ymlfile:
         yaml_loader = YamlEnvLoader(ymlfile)
         try:
-            #return loader.get_single_data()
             yaml_config = yaml_loader.get_single_data()
         finally:
             yaml_loader.dispose()

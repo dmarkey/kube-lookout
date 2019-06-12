@@ -23,10 +23,6 @@ class Receiver(object):
         if deployment.status.ready_replicas is not None:
             ready_replicas = deployment.status.ready_replicas
 
-        #unavailable_replicas = 0
-        #if deployment.status.unavailable_replicas is not None:
-        #    unavailable_replicas = deployment.status.unavailable_replicas
-
         rollout_complete = (
                 deployment.status.updated_replicas ==
                 deployment.status.replicas ==

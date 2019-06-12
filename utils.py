@@ -8,5 +8,3 @@ def generate_progress_bar(position, max_value):
     empty_char = "⬜"
     return (filled_char * int(filled_squares)) + (
             empty_char * (20 - int(filled_squares))) + "\n"
-
-

@@ -47,16 +47,18 @@ class FlowdockReceiver(Receiver):
 
         if message_id is None:
             # Send a new message
-            response = self.flowdock_client.present(item_id, author=author,
-                                                    title=title, body=item['body'], thread=item)
+            self.flowdock_client.present(item_id, author=author,
+                                         title=title,
+                                         body=item['body'],
+                                         thread=item)
             # FIXME - this is not ideal
             return item_id, item_id
 
         # Update exiting message
-        response = self.flowdock_client.present(item_id, author=author,
-                                                title=title,
-                                                body=item['body'],
-                                                thread=item)
+        self.flowdock_client.present(item_id, author=author,
+                                     title=title,
+                                     body=item['body'],
+                                     thread=item)
 
         # FIXME - this is not ideal
         return item_id, item_id

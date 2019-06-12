@@ -97,7 +97,7 @@ class SlackReceiver(Receiver):
             f"when it should have {deployment.spec.replicas}.\n"
 
         message += utils.generate_progress_bar(deployment.status.ready_replicas,
-                                          deployment.spec.replicas)
+                                               deployment.spec.replicas)
 
         block[0]['text']['text'] = header
         block[1]['text']['text'] = message
@@ -120,7 +120,7 @@ class SlackReceiver(Receiver):
             f"{deployment.spec.replicas}.\n"
 
         message += utils.generate_progress_bar(deployment.status.ready_replicas,
-                                        deployment.spec.replicas)
+                                               deployment.spec.replicas)
 
         block[0]['text']['text'] = header
         block[1]['text']['text'] = message
