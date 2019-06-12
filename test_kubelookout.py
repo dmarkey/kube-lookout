@@ -32,7 +32,7 @@ def test_slack_init():
 def test_send_slack_block():
     team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "#general"
+    slack_channel = "slack_channel"
     cluster_name = "bobo"
     images = mock_images()
 
@@ -52,7 +52,7 @@ def test_send_slack_block():
 def test_send_slack_block_channel_id():
     team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "#general"
+    slack_channel = "slack_channel"
     cluster_name = "bobo"
     images = mock_images()
 
@@ -72,7 +72,7 @@ def test_send_slack_block_channel_id():
 def test_deployment_rollout():
     team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "#general"
+    slack_channel = "slack_channel"
     cluster_name = "bobo"
     images = mock_images()
 
@@ -97,7 +97,6 @@ def test_deployment_rollout():
 
     assert klo.rollouts == {'test/test_deploy': ('1', '2')}
 
-
     klo._send_message.assert_called_once_with(
         [{'type': 'section',
           'text': {'type': 'mrkdwn',
@@ -109,14 +108,14 @@ def test_deployment_rollout():
               'type': 'image',
               'image_url': 'progress.png',
               'alt_text': 'status image'}}]
-        , channel='#general')
+        , 'slack_channel')
 
     deployment.status.updated_replicas = 2
     deployment.status.ready_replicas = 2
     deployment.status.replicas = 2
-    klo._send_slack_block = Mock(return_value=("1", "2"))
+    klo._send_message = Mock(return_value=("1", "2"))
     klo._handle_deployment_change(deployment)
-    klo._send_message.assert_called_once_with(blocks=[{'type': 'section',
+    klo._send_message.assert_called_once_with(data=[{'type': 'section',
                                                            'text': {
                                                                'type': 'mrkdwn',
                                                                'text': '*bobo deployment test/test_deploy is rolling out an update.*'}},
@@ -136,7 +135,7 @@ def test_deployment_rollout():
 def test_nothing_happening():
     team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "#general"
+    slack_channel = "slack_channel"
     cluster_name = "bobo"
     images = mock_images()
 
@@ -167,7 +166,7 @@ def test_nothing_happening():
 def test_degrade():
     team = "teambobo"
     slack_key = "slack_key"
-    slack_channel = "#general"
+    slack_channel = "slack_channel"
     cluster_name = "bobo"
     images = mock_images()
 
@@ -204,6 +203,7 @@ def test_degrade():
                                                         'image_url': 'warning.png',
                                                         'alt_text': 'status image'}}],
                                                   'slack_channel')
+
     assert klo.degraded == {"test/test_deploy"}
     klo._send_message = Mock(return_value=("1", "2"))
     deployment.status.ready_replicas = 2
