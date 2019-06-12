@@ -11,6 +11,7 @@ class Receiver(object):
         self.progress_image = images['progress']
 
         self.rollouts = {}
+        self.degraded = set()
 
         self.channel = None
 
@@ -18,34 +19,39 @@ class Receiver(object):
         metadata = deployment.metadata
         deployment_key = f"{metadata.namespace}/{metadata.name}"
 
-        ready_replicas = int(deployment.status.ready_replicas) \
-            if deployment.status.ready_replicas else 0
+        ready_replicas = 0
+        if deployment.status.ready_replicas is not None:
+            ready_replicas = deployment.status.ready_replicas
 
-        rollout_complete = (
-                deployment.status.updated_replicas ==
-                deployment.status.replicas ==
-                ready_replicas)
+        if deployment_key not in self.rollouts and \
+                deployment.status.updated_replicas is None:
+            blocks = self._generate_deployment_rollout_message(deployment)
+            resp = self._send_message(blocks, self.channel)
+            self.rollouts[deployment_key] = resp
 
-        if new_resource:
-            data = self._generate_deployment_rollout_message(deployment, True)
-            self.rollouts[deployment_key] = self._send_message(data, channel=self.channel)
-            print(self.rollouts)
-
-        elif rollout_complete:
-            data = self._generate_deployment_rollout_message(deployment, False, True)
-
-            self._send_message(
-                data,
+        elif deployment_key in self.rollouts:
+            rollout_complete = (
+                    deployment.status.updated_replicas ==
+                    deployment.status.replicas ==
+                    ready_replicas)
+            blocks = self._generate_deployment_rollout_message(deployment,
+                                                               rollout_complete)
+            self.rollouts[deployment_key] = self._send_message(
                 channel=self.rollouts[deployment_key][1],
-                message_id=self.rollouts[deployment_key][0])
+                message_id=self.rollouts[deployment_key][0], data=blocks)
 
-            self.rollouts.pop(deployment_key)
-
+            if rollout_complete:
+                self.rollouts.pop(deployment_key)
         elif ready_replicas < deployment.spec.replicas:
-            data = self._generate_deployment_degraded_message(deployment)
-            self._send_message(data,
-                channel=self.rollouts[deployment_key][1],
-                message_id=self.rollouts[deployment_key][0])
+            blocks = self._generate_deployment_degraded_message(deployment)
+            self._send_message(blocks, self.channel)
+            self.degraded.add(deployment_key)
+
+        elif (deployment_key in self.degraded and
+              ready_replicas >= deployment.spec.replicas):
+            self.degraded.remove(deployment_key)
+            blocks = self._generate_deployment_not_degraded_message(deployment)
+            self._send_message(blocks, self.channel)
 
     def _should_handle(self, team, receiver):
         return True if self.team == team and self.NAME == receiver \
@@ -56,4 +62,4 @@ class Receiver(object):
             print("Receiver '%s' handling event for team '%s'" % (receiver,
                                                                   team))
 
-            self._handle_deployment_change(deployment, new_resource)
+            self._handle_deployment_change(deployment)
