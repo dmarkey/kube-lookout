@@ -69,13 +69,10 @@ def main_loop(receivers):
 
             print(f"got event for {deployment.metadata.namespace}/{deployment.metadata.name}")
 
-            new_resource = True if event_type == 'ADDED' else False
-
             for receiver in receivers:
                 receiver.handle_event(annotation_team,
                                       annotation_receiver,
-                                      deployment,
-                                      new_resource)
+                                      deployment)
 
 
 def get_images_from_config(image_config):
