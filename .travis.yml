@@ -5,7 +5,9 @@ python:
 - '3.6'
 script:
 - set -e
-- pytest
+- pip install pipenv
+- pipenv install
+- pipenv run pytest
 - make image
 - make push-image
 env:
