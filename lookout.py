@@ -59,7 +59,7 @@ class KubeLookout:
         else:
             config.load_kube_config()
         api_client = client.api_client.ApiClient()
-        self.core = client.ExtensionsV1beta1Api(api_client)
+        self.core = client.AppsV1Api(api_client)
 
     def _send_slack_block(self, blocks, channel, message_id=None):
         if self.slack_client is None:
