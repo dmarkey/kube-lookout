@@ -5,6 +5,7 @@ python:
 - '3.8'
 script:
 - set -e
+- pip install pytest==6.2.2
 - pytest
 - make image
 - make push-image
