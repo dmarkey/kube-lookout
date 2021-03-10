@@ -1,5 +1,5 @@
 # kube-lookout
-A utility to post changes to kubernetes deployments to Slack. Developed particularly for use with flux but can be used with any Kubernetes set-up. Tested with EKS 1.12 and K3S (Kubernetes 1.14)
+A utility to post changes to kubernetes deployments to Slack. Developed particularly for use with flux but can be used with any Kubernetes set-up. Tested with EKS 1.16 and K3S (Kubernetes 1.17)
 
 ## What does it do?
 
