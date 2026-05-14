@@ -208,13 +208,13 @@ if __name__ == "__main__":
         "WARNING_IMAGE",
         "https://upload.wikimedia.org/wikipedia/"
         "commons/thumb/6/6e/Dialog-warning.svg/"
-        "200px-Dialog-warning.svg.png")
+        "250px-Dialog-warning.svg.png")
     env_progress_image = os.environ.get("PROGRESS_IMAGE",
                                         "https://i.gifer.com/80ZN.gif")
     env_ok_image = os.environ.get("OK_IMAGE",
                                   "https://upload.wikimedia.org/wikipedia/"
                                   "commons/thumb/f/fb/Yes_check.svg/"
-                                  "200px-Yes_check.svg.png")
+                                  "250px-Yes_check.svg.png")
     env_slack_token = os.environ["SLACK_TOKEN"]
     env_slack_channel = os.environ.get("SLACK_CHANNEL", "#general")
     env_cluster_name = os.environ.get("CLUSTER_NAME", "Kubernetes Cluster")
