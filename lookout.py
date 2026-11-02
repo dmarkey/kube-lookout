@@ -1,4 +1,5 @@
 import os
+import traceback
 from copy import copy
 
 from kubernetes import client, config, watch
@@ -78,6 +79,11 @@ class KubeLookout:
         metadata = deployment.metadata
         deployment_key = f"{metadata.namespace}/{metadata.name}"
 
+        if not deployment.spec.replicas:
+            self.rollouts.pop(deployment_key, None)
+            self.degraded.discard(deployment_key)
+            return
+
         ready_replicas = 0
         if deployment.status.ready_replicas is not None:
             ready_replicas = deployment.status.ready_replicas
@@ -127,7 +133,13 @@ class KubeLookout:
             print("Waiting for deployment events to come in..")
             for event in stream:
                 deployment = event['object']
-                self._handle_event(deployment)
+                try:
+                    self._handle_event(deployment)
+                except Exception:
+                    print(f"Failed to handle event for "
+                          f"{deployment.metadata.namespace}/"
+                          f"{deployment.metadata.name}", flush=True)
+                    traceback.print_exc()
 
     def _generate_deployment_rollout_block(self, deployment,
                                            rollout_complete=False):

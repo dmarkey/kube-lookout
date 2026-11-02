@@ -1,4 +1,5 @@
 from unittest.mock import Mock
+import pytest
 
 from lookout import KubeLookout
 
@@ -214,3 +215,98 @@ def test_degrade():
                                                         'image_url': 'ok.png',
                                                         'alt_text': 'status image'}}],
                                                   'slack_channel')
+
+
+def _klo():
+    klo = KubeLookout("warning.png", "progress.png", "ok.png",
+                      "slack_key", "slack_channel", "bobo")
+    klo._send_slack_block = Mock(return_value=("1", "2"))
+    return klo
+
+
+def _deployment(spec_replicas, updated_replicas=None, ready_replicas=None,
+                replicas=None):
+    deployment = Mock()
+    deployment.metadata.namespace = "citi"
+    deployment.metadata.name = "dbapi2"
+    deployment.spec.replicas = spec_replicas
+    deployment.status = Mock(updated_replicas=updated_replicas,
+                             ready_replicas=ready_replicas,
+                             replicas=replicas)
+    container = Mock(image="dbapi2:v9.375.0")
+    container.name = "dbapi2"
+    deployment.spec.template.spec.containers = [container]
+    return deployment
+
+
+def test_image_change_on_zero_replica_deployment_is_ignored():
+    klo = _klo()
+
+    klo._handle_deployment_change(_deployment(spec_replicas=0))
+
+    klo._send_slack_block.assert_not_called()
+    assert klo.rollouts == {}
+    assert klo.degraded == set()
+
+
+def test_scaling_to_zero_mid_rollout_forgets_the_rollout():
+    klo = _klo()
+    klo._handle_deployment_change(_deployment(spec_replicas=2,
+                                              ready_replicas=2, replicas=2))
+    assert klo.rollouts == {"citi/dbapi2": ("1", "2")}
+    klo._send_slack_block.reset_mock()
+
+    klo._handle_deployment_change(_deployment(spec_replicas=0))
+
+    klo._send_slack_block.assert_not_called()
+    assert klo.rollouts == {}
+
+
+def test_scaling_degraded_deployment_to_zero_clears_degraded():
+    klo = _klo()
+    klo._handle_deployment_change(_deployment(spec_replicas=2,
+                                              updated_replicas=2,
+                                              ready_replicas=1, replicas=2))
+    assert klo.degraded == {"citi/dbapi2"}
+    klo._send_slack_block.reset_mock()
+
+    klo._handle_deployment_change(_deployment(spec_replicas=0))
+
+    klo._send_slack_block.assert_not_called()
+    assert klo.degraded == set()
+
+
+def test_main_loop_keeps_watching_after_a_failing_event(monkeypatch):
+    import lookout
+
+    class StopLoop(Exception):
+        pass
+
+    klo = _klo()
+    klo.core = Mock()
+    init_calls = []
+
+    def init_client():
+        init_calls.append(1)
+        if len(init_calls) > 1:
+            raise StopLoop
+
+    klo._init_client = init_client
+    bad = _deployment(spec_replicas=2)
+    good = _deployment(spec_replicas=3)
+    handled = []
+
+    def handle_event(deployment):
+        if deployment is bad:
+            raise ValueError("boom")
+        handled.append(deployment)
+
+    klo._handle_event = handle_event
+    watcher = Mock()
+    watcher.stream.return_value = iter([{"object": bad}, {"object": good}])
+    monkeypatch.setattr(lookout.watch, "Watch", Mock(return_value=watcher))
+
+    with pytest.raises(StopLoop):
+        klo.main_loop()
+
+    assert handled == [good]
